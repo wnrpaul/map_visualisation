@@ -8,6 +8,8 @@ import overpy
 import os
 from shapely.geometry import LineString, Point, Polygon, MultiLineString, MultiPolygon, box
 from utils import create_bounding_box
+import json
+from collections import Counter
 
 DEFAULT_BUFFER = 0.01
 MIN_DISTANCE = 100
@@ -117,27 +119,45 @@ class DataLoader:
         
         # Debugging: Print the number of nodes, ways, and relations returned
         print(f"Nodes: {len(result.nodes)}, Ways: {len(result.ways)}, Relations: {len(result.relations)}")
-        
+                
+        # Define tag categories
+        TAG_CATEGORIES = {
+            "trees": ["natural=tree", "genus=", "species=", "leaf_type=", "leaf_cycle="],
+            "streets": ["highway="],
+            "buildings": ["building=", "building:"],
+            "rivers": ["waterway=river"],
+            "amenity": ["amenity="],
+            "address": ["addr:"],
+            "test": ["source=Data Toulouse"],
+            "shop": ["shop="],
+            "waste" : ["waste="],
+            "cycleway": ["cycleway="],   
+        }
+
         # Process nodes, ways, and relations
-        geometries_by_tag = {}
+        geometries_by_category = {category: [] for category in TAG_CATEGORIES}
+        tag_counter = Counter()  # To count the occurrence of each tag key
+
         for node in result.nodes:
             point = Point(float(node.lon), float(node.lat))
             for key, value in node.tags.items():
                 tag_key = f"{key}={value}"
-                if tag_key not in geometries_by_tag:
-                    geometries_by_tag[tag_key] = []
-                geometries_by_tag[tag_key].append(point)
-        
+                tag_counter[tag_key] += 1 # Count tag occurrences
+                for category, patterns in TAG_CATEGORIES.items():
+                    if any(pattern in tag_key for pattern in patterns):
+                        geometries_by_category[category].append(point)
+
         for way in result.ways:
             coords = [(float(node.lon), float(node.lat)) for node in way.nodes]
             if len(coords) > 1:  # Ensure there are at least two points to form a line
                 line = LineString(coords)
                 for key, value in way.tags.items():
                     tag_key = f"{key}={value}"
-                    if tag_key not in geometries_by_tag:
-                        geometries_by_tag[tag_key] = []
-                    geometries_by_tag[tag_key].append(line)
-        
+                    tag_counter[tag_key] += 1 # Count tag occurrences
+                    for category, patterns in TAG_CATEGORIES.items():
+                        if any(pattern in tag_key for pattern in patterns):
+                            geometries_by_category[category].append(line)
+
         for relation in result.relations:
             outer_coords = []
             for member in relation.members:
@@ -150,16 +170,24 @@ class DataLoader:
                 multi_polygon = MultiPolygon(polygons) if len(polygons) > 1 else polygons[0]
                 for key, value in relation.tags.items():
                     tag_key = f"{key}={value}"
-                    if tag_key not in geometries_by_tag:
-                        geometries_by_tag[tag_key] = []
-                    geometries_by_tag[tag_key].append(multi_polygon)
-        
-        # Create GeoDataFrames for each tag
+                    tag_counter[tag_key] += 1 # Count tag occurrences
+                    for category, patterns in TAG_CATEGORIES.items():
+                        if any(pattern in tag_key for pattern in patterns):
+                            geometries_by_category[category].append(multi_polygon)
+
+        # Create GeoDataFrames for each category
         self.map_objects = {}
-        for tag_key, geometries in geometries_by_tag.items():
-            gdf = gpd.GeoDataFrame(geometry=geometries, crs="EPSG:4326")
-            self.map_objects[tag_key] = gdf
-            print(f"Loaded {len(gdf)} features with tag '{tag_key}' from OSM.")
+        for category, geometries in geometries_by_category.items():
+            if geometries:
+                gdf = gpd.GeoDataFrame(geometry=geometries, crs="EPSG:4326")
+                self.map_objects[category] = gdf
+                print(f"Loaded {len(gdf)} features for category '{category}' from OSM.")
+
+        # Export tag counts to JSON
+        tag_counts_dict = dict(tag_counter.most_common())  # Convert Counter to dictionary
+        with open("tag_counts.json", "w") as f:
+            json.dump(tag_counts_dict, f, indent=4)
+        print("\nTag counts have been saved to 'tag_counts.json'.")
     except Exception as e:
         print(f"Error loading OSM features: {e}")
 

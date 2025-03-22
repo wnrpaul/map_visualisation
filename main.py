@@ -9,7 +9,7 @@ if __name__ == "__main__":
 
     app.load_gps_file(gps_file_path)
 
-    app.load_osm_features(distance=300)
+    app.load_osm_features(distance=1000)
 
     #app.export_map_objects_to_geojson(file_path="osm_features.geojson")
 

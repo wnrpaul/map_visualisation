@@ -3,8 +3,8 @@ track:
   linewidth: 2
 
 trees:
-  color: "#00ff00"
-  size: 5
+  color: "green"
+  size: 1
 
 streets:
   color: "#000000"
@@ -18,3 +18,23 @@ buildings:
 rivers:
   color: "#0000ff"
   linewidth: 2
+
+amenity:
+  color: "salmon"
+  linewidth: 1
+  alpha: 0.7
+
+shop:
+  color: "orange"
+  linewidth: 1
+  alpha: 1
+
+cycleway:
+  color: "darkblue"
+  linewidth: 1
+  alpha: 1
+
+#test:
+#  color: 'brown'
+#  linewidth: 1
+#  alpha: 0.9
